@@ -13,6 +13,7 @@ MAGNITUDE_COLUMN = "mag"
 DISTANCE_COLUMN = "distance"
 LATITUDE_COLUMN = "latitude"
 LONGITUDE_COLUMN = "longitude"
+TIMEZONE = 'UTC'
 
 
 def get_haversine_distance(latitude_list, longitude_list, point_latitude, point_longitude):
@@ -57,3 +58,48 @@ def get_haversine_distance(latitude_list, longitude_list, point_latitude, point_
 
     return distances
 
+
+def compute_payouts(earthquake_data, payouts_structure, return_type='dict') -> dict:
+    """
+    Function to calculate payouts over the years according to earthquake data and a payout structure
+    :param return_type: Specify function return type if Python Dictionary 'dict' or Pandas Series 'series'. Dict by
+    default
+    :param payouts_structure: the payouts structure that defines how much is paid per year
+    :param earthquake_data: the historical earthquake data for the period of time of interest
+    :return: a map of payout percentage per year. eg: 2010: 50 for a 50% payout in 2010.
+    """
+    valid_return_types = ['dict', 'series']
+    if return_type not in valid_return_types:
+        raise TypeError("Specified return type is not supported.")
+    # Convert the time column from string type to datetime
+    earthquake_data[TIME_COLUMN] = pd.to_datetime(earthquake_data[TIME_COLUMN])
+    # Get start year of data
+    start_year = earthquake_data[TIME_COLUMN].min().year
+    # Get end year of data
+    end_year = earthquake_data[TIME_COLUMN].max().year
+    # Create empty payouts dict
+    payouts = {}
+    # Loop over every year from start to end in earthquake data
+    for year in range(start_year, end_year + 1):
+        # Get earthquake data for current year
+        timestamp_start = pd.Timestamp(year=year, month=1, day=1, tz=TIMEZONE)
+        timestamp_end = pd.Timestamp(year=year + 1, month=1, day=1, tz=TIMEZONE)
+        earthquake_data_year = earthquake_data[
+            (earthquake_data[TIME_COLUMN] >= timestamp_start) & (earthquake_data[TIME_COLUMN] < timestamp_end)]
+        # Set no payout as default
+        payouts[year] = 0
+        # Loop over every payout possibility
+        for payout_struct in payouts_structure:
+            # If magnitude and distance criteria are met,
+            if any((earthquake_data_year[MAGNITUDE_COLUMN] >= payout_struct[1]) &
+                   (earthquake_data_year[DISTANCE_COLUMN] <= payout_struct[0])):
+                # specify corresponding payout
+                # If no payout is recorded or if the current recorded payout is less, update payout
+                if payouts[year] < payout_struct[2]:
+                    payouts[year] = payout_struct[2]
+    if return_type == 'dict':
+        return payouts
+    elif return_type == 'series':
+        return pd.Series(payouts)
+    else:
+        raise TypeError("Specified return type is not supported.")
