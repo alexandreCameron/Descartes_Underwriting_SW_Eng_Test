@@ -11,7 +11,6 @@ from io import BytesIO
 import pandas as pd
 import asyncio
 import aiohttp
-
 # import from project
 
 # TODO: refactor API params in separate file and use them in tests
@@ -85,6 +84,51 @@ def format_api_parameters(arguments_dict):
                              "Make sure each provided arguments is supported.")
 
     return parameters
+
+
+def get_earthquake_data(**kwargs):
+    """
+    function to get earthquake data from API
+
+    :key latitude: latitude in degrees of the desired geographic point:
+    :key longitude: longitude in degrees of the desired geographic point
+    :key radius: Limit events to a maximum number of kilometers away from the desired geographic point
+    :key minimum_magnitude: Limit to events with a magnitude larger than the specified minimum.
+    :key end_date: Limit to events on or before the specified end time.
+    :key format: Specify the format of the API response. By default, Earthquakes are chosen
+    :key event_type: Limit to specific event types. By default, CSV is chosen
+    :return: Returns a dataframe of the requested earthquake events if the API request is successful,
+    and none otherwise
+    """
+    # If an end date is provided, set the start date with an offset
+    if END_DATE_ARG in kwargs:
+        # Set number of years to go back from end_date
+        offset_years = 200
+        # Set start_date by subtracting the number of offset years from the end date
+        kwargs[START_DATE_ARG] = kwargs[END_DATE_ARG] - pd.DateOffset(years=offset_years)
+    # If the event type is not specified, add it
+    if EVENT_ARG not in kwargs:
+        kwargs[EVENT_ARG] = 'earthquake'
+    # If the format type is not specified, add it
+    if FORMAT_ARG not in kwargs:
+        kwargs[FORMAT_ARG] = 'csv'
+    # Properly format input arguments as API parameters
+    parameters = format_api_parameters(arguments_dict=kwargs)
+    # set the correct method for the API
+    method = 'query'
+    # build the api url with the correct method and desired parameters
+    api_url = build_api_url(method=method, parameters=parameters)
+    # open api url and save response
+    response = urllib.request.urlopen(api_url)
+    # if HTTP response code is 200 (meaning success) then save dataframe
+    if response.status == 200:
+        response_df = pd.read_csv(BytesIO(response.read()))
+    # else set return to None
+    else:
+        response_df = None
+        print(f'No dataframe was returned. HTTP Response Code: {response.status}')
+
+    return response_df
 
 
 def build_api_url(method, parameters):
