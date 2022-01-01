@@ -158,3 +158,46 @@ def build_api_url(method, parameters):
     url_values = urllib.parse.urlencode(parameters)
     api_url = api_url_method + url_values
     return api_url
+
+
+async def get_earthquake_data_for_multiple_locations(assets, **kwargs):
+    # If an end date is provided, set the start date with an offset
+    if END_DATE_ARG in kwargs:
+        # Set number of years to go back from end_date
+        offset_years = 200
+        # Set start_date by subtracting the number of offset years from the end date
+        kwargs[START_DATE_ARG] = kwargs[END_DATE_ARG] - pd.DateOffset(years=offset_years)
+    # If the event type is not specified, add it
+    if EVENT_ARG not in kwargs:
+        kwargs[EVENT_ARG] = 'earthquake'
+    # If the format type is not specified, add it
+    if FORMAT_ARG not in kwargs:
+        kwargs[FORMAT_ARG] = 'csv'
+
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for asset in assets:
+            # Add latitude and longitude to kwargs
+            kwargs[LATITUDE_ARG] = asset[0]
+            kwargs[LONGITUDE_ARG] = asset[1]
+            # Properly format input arguments as API parameters
+            parameters = format_api_parameters(arguments_dict=copy.deepcopy(kwargs))
+            # set the correct method for the API
+            method = 'query'
+            # build the api url with the correct method and desired parameters
+            api_url = build_api_url(method=method, parameters=parameters)
+            tasks.append(asyncio.ensure_future(get_earthquake_data_async(session=session,
+                                                                         url=api_url)))
+        earthquake_data_assets_list = await asyncio.gather(*tasks)
+        earthquake_data_assets = pd.concat(earthquake_data_assets_list, ignore_index=True)
+    return earthquake_data_assets
+
+
+async def get_earthquake_data_async(session, url):
+    async with session.get(url) as response:
+        if response.status == 200:
+            response_csv = await response.read()
+            response_df = pd.read_csv(BytesIO(response_csv))
+        else:
+            response_df = None
+        return response_df
