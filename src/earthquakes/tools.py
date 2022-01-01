@@ -103,3 +103,38 @@ def compute_payouts(earthquake_data, payouts_structure, return_type='dict') -> d
         return pd.Series(payouts)
     else:
         raise TypeError("Specified return type is not supported.")
+
+
+def compute_burning_cost(payouts, start_year, end_year):
+    """
+    Function to compute burning cost. The burning cost is the average of payouts over a time range.
+    :param payouts: The payouts that have happened every year for a certain period
+    :param start_year: First year to calculate burning cost
+    :param end_year: Last year to calculate burning cost
+    :return: burning cost value over the provided time range
+    """
+    # Check type of payouts argument
+    if not isinstance(payouts, (pd.Series, dict)):
+        raise TypeError('Payouts input argument type is not supported.')
+    # Check if start year data is available, else raise error
+    if start_year < min(payouts.keys()):
+        raise AttributeError(f'The year {start_year} does not exist in payouts. '
+                             f'Provide a more recent one.')
+    # Check if end year data is available, else raise error
+    if end_year > max(payouts.keys()):
+        raise AttributeError(f'The year {end_year} does not exist in payouts. '
+                             f'Provide a less recent one.')
+    # Calculate number of years between start_year and end_year
+    number_of_years = end_year - start_year + 1
+    # Create a range object for the needed years
+    years_range = range(start_year, end_year + 1)
+    # Initialize the sum of payouts
+    sum_payouts = 0
+    # Loop over every year between start_year and end_year
+    # This method works for both dicts and Series types and is faster than other methods
+    for year in years_range:
+        # Add the year payout to the cumulative sum
+        sum_payouts += payouts[year]
+    # Divide the payouts sum by the number of years
+    burning_cost = sum_payouts / number_of_years
+    return burning_cost
