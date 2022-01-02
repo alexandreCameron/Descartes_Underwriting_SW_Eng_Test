@@ -34,6 +34,10 @@ FORMAT_ARG = 'format'
 # List the valid methods for the USGS API
 VALID_METHODS = ['application.json', 'application.wadl', 'catalogs', 'contributors', 'count', 'query', 'version']
 VALID_FORMATS = ["quakeml", "geojson", "csv", "kml", "kmlraw", "xml", "text", "cap"]
+VALID_PARAMS = [EVENT_PARAM, FORMAT_PARAM, LATITUDE_PARAM, LONGITUDE_PARAM, END_DATE_PARAM, START_DATE_PARAM,
+                MIN_MAGNITUDE_PARAM, MAX_RADIUS_KM_PARAM]
+VALID_ARGS = [EVENT_ARG, FORMAT_ARG, LATITUDE_ARG, LONGITUDE_ARG, END_DATE_ARG, START_DATE_ARG,
+              MIN_MAGNITUDE_ARG, MAX_RADIUS_KM_ARG]
 
 # Base API URL
 BASE_API_URL = r'https://earthquake.usgs.gov/fdsnws/event/1/'
@@ -48,18 +52,24 @@ def format_api_parameters(arguments_dict):
     """
     # Initialize parameters dict
     parameters = {}
+    # Deep copy provided arguments dict to avoid editing the same variable which can cause errors
+    arguments_dict = copy.deepcopy(arguments_dict)
+
+    if FORMAT_ARG in arguments_dict:
+        parameters[FORMAT_PARAM] = arguments_dict.pop(FORMAT_ARG)
+
+    if START_DATE_ARG in arguments_dict:
+        # Set start_date
+        start_date = arguments_dict.pop(START_DATE_ARG)
+        # format start time correctly
+        parameters[START_DATE_PARAM] = f'{start_date.year}-{start_date.month:02}-{start_date.day:02}'
+
     # check if end_date is provided in args
     if END_DATE_ARG in arguments_dict:
         # Set end_date
         end_date = arguments_dict.pop(END_DATE_ARG)
         # format end time correctly
-        parameters[END_DATE_PARAM] = f'{end_date.year}-{end_date.month}-{end_date.day}'
-
-    if START_DATE_ARG in arguments_dict:
-        # Set end_date
-        start_date = arguments_dict.pop(START_DATE_ARG)
-        # format start time correctly
-        parameters[START_DATE_PARAM] = f'{start_date.year}-{start_date.month}-{start_date.day}'
+        parameters[END_DATE_PARAM] = f'{end_date.year}-{end_date.month:02}-{end_date.day:02}'
 
     if LATITUDE_ARG in arguments_dict:
         parameters[LATITUDE_PARAM] = arguments_dict.pop(LATITUDE_ARG)
@@ -76,14 +86,58 @@ def format_api_parameters(arguments_dict):
     if EVENT_ARG in arguments_dict:
         parameters[EVENT_PARAM] = arguments_dict.pop(EVENT_ARG)
 
-    if FORMAT_ARG in arguments_dict:
-        parameters[FORMAT_PARAM] = arguments_dict.pop(FORMAT_ARG)
     # if dict is not empty, then some arguments haven't been formatted.
     if arguments_dict:
         raise AttributeError("Not all provided arguments have been formatted as parameters. "
-                             "Make sure each provided arguments is supported.")
+                             "Make sure each provided argument is supported.")
 
     return parameters
+
+
+def build_api_url(method, arguments):
+    """
+    Function to build an api url using the given method and parameters
+
+    :param method: desired method for the api request
+    :param arguments:  necessary parameters corresponding to the given method
+    :return: returns a correctly formatted url for the APIhttps://earthquake.usgs.gov/fdsnws/event/1/
+    """
+
+    # check if empty parameters
+    if not arguments:
+        raise ValueError("empty parameters input")
+    # check if provided arguments are valid
+    for arg in arguments:
+        if arg not in VALID_ARGS:
+            raise ValueError(f"Provided argument is not supported. Arg: {arg}")
+    # Check if required arguments are missing:
+    if LATITUDE_ARG in arguments and LONGITUDE_ARG not in arguments:
+        raise AssertionError("Latitude argument is provided without a Longitude argument")
+    if LATITUDE_ARG not in arguments and LONGITUDE_ARG in arguments:
+        raise AssertionError("Longitude argument is provided without a Latitude argument")
+    if MAX_RADIUS_KM_ARG in arguments and( LATITUDE_ARG not in arguments or LONGITUDE_ARG not in arguments):
+        raise AssertionError("Radius argument is given without Latitude or Longitude argument")
+    # format arguments into API parameters
+    params = format_api_parameters(arguments)
+    # Check that returned parameters are valid
+    for param in params:
+        if param not in VALID_PARAMS:
+            raise ValueError(f"provided parameter does not seem to be valid. Param: {param}")
+    # Check that format parameter exists
+    if FORMAT_PARAM not in params:
+        raise ValueError("format parameter was not provided")
+    # Check that format parameter is valid
+    if params[FORMAT_PARAM] not in VALID_FORMATS:
+        raise ValueError("provided format parameter does not seem to be valid")
+    # Check that method is valid
+    if method not in VALID_METHODS:
+        raise ValueError("provided method does not seem to be valid")
+    # Append the chosen method to the base url
+    api_url_method = BASE_API_URL + method + '?'
+    # Append every input parameter to api url
+    url_values = urllib.parse.urlencode(params)
+    api_url = api_url_method + url_values
+    return api_url
 
 
 def get_earthquake_data(**kwargs):
@@ -112,12 +166,10 @@ def get_earthquake_data(**kwargs):
     # If the format type is not specified, add it
     if FORMAT_ARG not in kwargs:
         kwargs[FORMAT_ARG] = 'csv'
-    # Properly format input arguments as API parameters
-    parameters = format_api_parameters(arguments_dict=kwargs)
     # set the correct method for the API
     method = 'query'
     # build the api url with the correct method and desired parameters
-    api_url = build_api_url(method=method, parameters=parameters)
+    api_url = build_api_url(method=method, arguments=kwargs)
     # open api url and save response
     response = urllib.request.urlopen(api_url)
     # if HTTP response code is 200 (meaning success) then save dataframe
@@ -129,35 +181,6 @@ def get_earthquake_data(**kwargs):
         print(f'No dataframe was returned. HTTP Response Code: {response.status}')
 
     return response_df
-
-
-def build_api_url(method, parameters):
-    """
-    Function to build an api url using the given method and parameters
-
-    :param method: desired method for the api request
-    :param parameters:  necessary parameters corresponding to the given method
-    :return: returns a correctly formatted url for the APIhttps://earthquake.usgs.gov/fdsnws/event/1/
-    """
-
-    # check if empty parameters
-    if not parameters:
-        raise ValueError("empty parameters input")
-    # Check that format parameter exist and exists
-    if FORMAT_PARAM not in parameters:
-        raise ValueError("format parameter was not provided")
-    # Check that format parameter exist and exists
-    if parameters[FORMAT_PARAM] not in VALID_FORMATS:
-        raise ValueError("provided format parameter does not seem to be valid")
-    # Check that method is valid
-    if method not in VALID_METHODS:
-        raise ValueError("provided method does not seem to be valid")
-    # Append the chosen method to the base url
-    api_url_method = BASE_API_URL + method + '?'
-    # Append every input parameter to api url
-    url_values = urllib.parse.urlencode(parameters)
-    api_url = api_url_method + url_values
-    return api_url
 
 
 async def get_earthquake_data_for_multiple_locations(assets, **kwargs):
@@ -180,16 +203,14 @@ async def get_earthquake_data_for_multiple_locations(assets, **kwargs):
             # Add latitude and longitude to kwargs
             kwargs[LATITUDE_ARG] = asset[0]
             kwargs[LONGITUDE_ARG] = asset[1]
-            # Properly format input arguments as API parameters
-            parameters = format_api_parameters(arguments_dict=copy.deepcopy(kwargs))
             # set the correct method for the API
             method = 'query'
             # build the api url with the correct method and desired parameters
-            api_url = build_api_url(method=method, parameters=parameters)
+            api_url = build_api_url(method=method, arguments=kwargs)
             tasks.append(asyncio.ensure_future(get_earthquake_data_async(session=session,
                                                                          url=api_url)))
         earthquake_data_assets_list = await asyncio.gather(*tasks)
-        earthquake_data_assets = pd.concat(earthquake_data_assets_list, ignore_index=True)
+        earthquake_data_assets = pd.concat(earthquake_data_assets_list, ignore_index=True).drop_duplicates()
     return earthquake_data_assets
 
 
