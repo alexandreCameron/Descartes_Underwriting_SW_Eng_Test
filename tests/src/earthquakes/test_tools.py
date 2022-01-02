@@ -18,7 +18,7 @@ def sample_locations():
     asset = (35.2, 25.1)
     eq_lat = [35.2, 37.32, -75, 45]
     eq_long = [25.1, 23, 30, -20]
-    distances = [0, 301.68, 12258.95, 3932.67]
+    distances = [0, 302.01, 12272.40, 3936.99]
     return asset, eq_lat, eq_long, distances
 
 
