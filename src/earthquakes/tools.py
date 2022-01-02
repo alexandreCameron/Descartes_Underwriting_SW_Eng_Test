@@ -59,16 +59,21 @@ def get_haversine_distance(latitude_list, longitude_list, point_latitude, point_
     return distances
 
 
-def compute_payouts(earthquake_data, payouts_structure, return_type='dict') -> dict:
+def compute_payouts(earthquake_data, payouts_structure, return_type='dict'):
     """
     Function to calculate payouts over the years according to earthquake data and a payout structure
     :param return_type: Specify function return type if Python Dictionary 'dict' or Pandas Series 'series'. Dict by
     default
-    :param payouts_structure: the payouts structure that defines how much is paid per year
+    :param payouts_structure: the payouts structure that defines how much is paid per year. List of lists.
     :param earthquake_data: the historical earthquake data for the period of time of interest
     :return: a map of payout percentage per year. eg: 2010: 50 for a 50% payout in 2010.
     """
+    if earthquake_data.empty:
+        raise ValueError('Provided earthquake data is empty.')
+    if not payouts_structure:
+        raise ValueError('Provided payouts structure is empty.')
     valid_return_types = ['dict', 'series']
+    return_type = return_type.lower()
     if return_type not in valid_return_types:
         raise TypeError("Specified return type is not supported.")
     # Convert the time column from string type to datetime
