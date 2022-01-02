@@ -133,8 +133,10 @@ def compute_burning_cost(payouts, start_year, end_year):
     # Loop over every year between start_year and end_year
     # This method works for both dicts and Series types and is faster than other methods
     for year in years_range:
-        # Add the year payout to the cumulative sum
-        sum_payouts += payouts[year]
+        # Assume zero payout if year does not exist
+        if year in payouts:
+            # Add the year payout to the cumulative sum
+            sum_payouts += payouts[year]
     # Divide the payouts sum by the number of years
     burning_cost = sum_payouts / number_of_years
     return burning_cost
