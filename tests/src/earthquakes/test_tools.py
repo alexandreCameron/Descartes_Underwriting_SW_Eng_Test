@@ -69,6 +69,18 @@ class TestGetHaversineDistance:
                                                      point_latitude=asset[0], point_longitude=asset[1])
         assert np.allclose(distances, haversine_distances)
 
+    def test_return_size(self, sample_locations):
+        asset, eq_lat, eq_long, distances = sample_locations
+        haversine_distances = get_haversine_distance(latitude_list=eq_lat, longitude_list=eq_long,
+                                                     point_latitude=asset[0], point_longitude=asset[1])
+        assert len(haversine_distances) == len(distances)
+
+    def test_return_type(self, sample_locations):
+        asset, eq_lat, eq_long, distances = sample_locations
+        haversine_distances = get_haversine_distance(latitude_list=eq_lat, longitude_list=eq_long,
+                                                     point_latitude=asset[0], point_longitude=asset[1])
+        assert isinstance(haversine_distances, (np.ndarray, list))
+
     def test_invalid_asset(self, sample_locations):
         _, eq_lat, eq_long, distances = sample_locations
         assets = [(35.2, 190), (-110, 35.2)]
