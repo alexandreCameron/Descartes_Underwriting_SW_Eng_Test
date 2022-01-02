@@ -108,3 +108,60 @@ class TestGetHaversineDistance:
                                    point_latitude=asset[0], point_longitude=asset[1])
 
 
+class TestComputePayouts:
+    def test_sample_payout(self, sample_earthquake_data_with_payouts):
+        earthquake_data, payouts_structure, payouts = sample_earthquake_data_with_payouts
+        payouts_test = compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure)
+        assert payouts_test == payouts
+
+    def test_empty_data(self, sample_earthquake_data_with_payouts):
+        _, payouts_structure, _ = sample_earthquake_data_with_payouts
+        earthquake_data = pd.DataFrame()
+        with pytest.raises(ValueError):
+            compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure)
+
+    def test_empty_payouts_structure(self, sample_earthquake_data_with_payouts):
+        earthquake_data, _, _ = sample_earthquake_data_with_payouts
+        payouts_structure = []
+        with pytest.raises(ValueError):
+            compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure)
+
+    def test_invalid_return_type(self, sample_earthquake_data_with_payouts):
+        earthquake_data, payouts_structure, _ = sample_earthquake_data_with_payouts
+        with pytest.raises(TypeError):
+            compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure, return_type='')
+
+    def test_return_dict(self, sample_earthquake_data_with_payouts):
+        earthquake_data, payouts_structure, _ = sample_earthquake_data_with_payouts
+        payouts_test = compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure,
+                                       return_type='dict')
+        assert isinstance(payouts_test, dict)
+
+    def test_return_series(self, sample_earthquake_data_with_payouts):
+        earthquake_data, payouts_structure, _ = sample_earthquake_data_with_payouts
+        payouts_test = compute_payouts(earthquake_data=earthquake_data, payouts_structure=payouts_structure,
+                                       return_type='series')
+        assert isinstance(payouts_test, pd.Series)
+
+
+class TestComputeBurningCost:
+    def test_sample_burning_cost(self, sample_burning_cost):
+        payouts, burning_costs = sample_burning_cost
+        for item in burning_costs:
+            burning_cost = compute_burning_cost(payouts=payouts, start_year=item[0], end_year=item[1])
+            assert np.allclose(burning_cost, item[2])
+
+    def test_empty_payouts_dict(self):
+        with pytest.raises(ValueError):
+            compute_burning_cost({}, 2000, 2012)
+
+    def test_empty_payouts_series(self):
+        with pytest.raises(ValueError):
+            compute_burning_cost(pd.Series(dtype=float), 2000, 2012)
+
+    def test_years_outside_bounds(self, sample_burning_cost):
+        payouts, burning_costs = sample_burning_cost
+        with pytest.raises(AttributeError):
+            compute_burning_cost(payouts=payouts, start_year=2000, end_year=2013)
+        with pytest.raises(AttributeError):
+            compute_burning_cost(payouts=payouts, start_year=1999, end_year=2010)
